@@ -103,7 +103,7 @@ class TavilyWebSearchTool(Tool):
     """Search the web using Tavily Search API."""
 
     name = "tavily_web_search"
-    description = "Search the web. Returns titles, URLs, and snippets."
+    description = "Search the web for current and real-time information. Use this tool when you need up-to-date facts, recent events, or information that changes over time (e.g., current dates, latest news, current statistics, who's the current president, stock prices, etc.). Returns titles, URLs, and snippets."
     parameters = {
         "type": "object",
         "properties": {
