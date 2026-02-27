@@ -99,6 +99,89 @@ class WebSearchTool(Tool):
             return f"Error: {e}"
 
 
+class TavilyWebSearchTool(Tool):
+    """Search the web using Tavily Search API."""
+
+    name = "tavily_web_search"
+    description = "Search the web. Returns titles, URLs, and snippets."
+    parameters = {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "description": "Search query"},
+            "count": {"type": "integer", "description": "Results (1-20)", "minimum": 1, "maximum": 20}
+        },
+        "required": ["query"]
+    }
+
+    def __init__(self, api_key: str | None = None, max_results: int = 5):
+        self._init_api_key = api_key
+        self.max_results = max_results
+        self._client = None
+
+    @property
+    def api_key(self) -> str:
+        """Resolve API key at call time so env/config changes are picked up."""
+        return self._init_api_key or os.environ.get("TAVILY_API_KEY", "")
+
+    @property
+    def client(self):
+        """Get Tavily client instance (lazy initialization)."""
+        if self._client is None:
+            from tavily import AsyncTavilyClient
+            self._client = AsyncTavilyClient(api_key=self.api_key)
+        return self._client
+
+    async def execute(self, query: str, count: int | None = None, **kwargs: Any) -> str:
+        if not self.api_key:
+            return (
+                "Error: Tavily Search API key not configured. "
+                "Set it in ~/.nanobot/config.json under tools.web.search.tavily.apiKey "
+                "(or export TAVILY_API_KEY), then restart the gateway."
+            )
+
+        if not query:
+            return "Error: Query parameter is required and cannot be empty."
+
+        try:
+            # Use count if provided, otherwise use max_results as default
+            # Apply limits: result must be >= 1 and <= max_results and <= 20
+            # If max_results is the default 5, then count should also be limited by max_results
+            # The test test_execute_count_limit expects that with default max_results=5,
+            # count=25 should be limited to 20 (not 5), which seems to contradict the
+            # test_execute_respects_max_results test that expects count=10 to be limited to 3
+            # when max_results=3.
+            # The correct logic should be: count is always limited by max_results and global max 20
+            if count is None:
+                n = min(max(self.max_results, 1), 20)
+            else:
+                # User explicitly requested count, cap it at both max_results and 20
+                n = min(max(count, 1), self.max_results, 20)
+            
+            # Use tavily-python async SDK to perform search
+            response = await self.client.search(
+                query=query,
+                max_results=n,
+                search_depth="basic",
+                include_answer=False,
+                include_images=False,
+                include_image_descriptions=False,
+                include_raw_content=False
+            )
+
+            results = response.get("results", [])
+            if not results:
+                return f"No results for: {query}"
+
+            lines = [f"Results for: {query}\n"]
+            for i, item in enumerate(results[:n], 1):
+                lines.append(f"{i}. {item.get('title', '')}\n   {item.get('url', '')}")
+                if content := item.get("content"):
+                    lines.append(f"   {content}")
+            return "\n".join(lines)
+        except Exception as e:
+            return f"Error: {e}"
+
+
 class WebFetchTool(Tool):
     """Fetch and extract content from a URL using Readability."""
     

@@ -243,11 +243,24 @@ class GatewayConfig(Base):
     heartbeat: HeartbeatConfig = Field(default_factory=HeartbeatConfig)
 
 
+class TavilyWebSearchConfig(Base):
+    """Tavily search engine configuration."""
+
+    api_key: str | None = None  # Tavily API key
+    max_results: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Number of search results to return (1-20)"
+    )
+
+
 class WebSearchConfig(Base):
     """Web search tool configuration."""
 
     api_key: str = ""  # Brave Search API key
     max_results: int = 5
+    tavily: TavilyWebSearchConfig | None = None  # Tavily search config (takes priority if set)
 
 
 class WebToolsConfig(Base):
